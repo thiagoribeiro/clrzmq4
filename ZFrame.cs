@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -10,10 +8,10 @@ using ZeroMQ.lib;
 namespace ZeroMQ
 {
 
-	/// <summary>
-	/// A single part message, sent or received via a <see cref="ZSocket"/>.
-	/// </summary>
-	public sealed class ZFrame : Stream, ICloneable
+    /// <summary>
+    /// A single part message, sent or received via a <see cref="ZSocket"/>.
+    /// </summary>
+    public sealed class ZFrame : Stream, ICloneable
 	{
 		public static ZFrame FromStream(Stream stream, long i, int l)
 		{
@@ -21,19 +19,9 @@ namespace ZeroMQ
 			if (l == 0) return new ZFrame();
 
 			var frame = ZFrame.Create(l);
-			var buf = new byte[65535];
-			int bufLen, remaining, current = -1;
-			do {
-				++current;
-				remaining = Math.Min(Math.Max(0, l - current * buf.Length), buf.Length);
-				if (remaining < 1) break;
-				
-				bufLen = stream.Read(buf, 0, remaining);
-				frame.Write(buf, 0, bufLen);
-
-			} while (bufLen > 0);
-
+            stream.CopyTo(frame);
 			frame.Position = 0;
+
 			return frame;
 		}
 
