@@ -1,18 +1,17 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Text;
 
 namespace ZeroMQ
 {
-	/// <summary>
-	/// A single or multi-part message, sent or received via a <see cref="ZSocket"/>.
-	/// </summary>
-	public class ZMessage : IList<ZFrame>, ICloneable, IDisposable
+    /// <summary>
+    /// A single or multi-part message, sent or received via a <see cref="ZSocket"/>.
+    /// </summary>
+    public class ZMessage : IList<ZFrame>, ICloneable, IDisposable
 	{
-		private List<ZFrame> _frames;
+		private LinkedList<ZFrame> _frames;
 
 		/// <summary>
 		/// Initializes a new instance of the <see cref="ZMessage"/> class.
@@ -20,7 +19,7 @@ namespace ZeroMQ
 		/// </summary>
 		public ZMessage()
 		{ 
-			_frames = new List<ZFrame>();
+			_frames = new LinkedList<ZFrame>();
 		}
 
 		/// <summary>
@@ -36,7 +35,7 @@ namespace ZeroMQ
 				throw new ArgumentNullException("frames");
 			}
 
-			_frames = new List<ZFrame>(frames);
+			_frames = new LinkedList<ZFrame>(frames);
 		}
 
 		public void Dispose()
@@ -75,8 +74,20 @@ namespace ZeroMQ
 
 		public ZFrame ReplaceAt(int index, ZFrame replacement, bool dispose) 
 		{
-			ZFrame old = _frames[index];
-			_frames[index] = replacement;
+			ZFrame old = _frames.ElementAt(index);
+
+            if (_frames.First() == old)
+            {
+                _frames.RemoveFirst();
+                _frames.AddFirst(replacement);
+            }
+            else
+            {
+                var oldNode = _frames.Find(old);
+                _frames.AddAfter(oldNode.Previous, replacement);
+                _frames.Remove(oldNode);
+            }
+            
 			if (dispose)
 			{
 				old.Dispose();
@@ -89,17 +100,29 @@ namespace ZeroMQ
 
 		public int IndexOf(ZFrame item)
 		{
-			return _frames.IndexOf(item);
+            int index = 0;
+            var node = _frames.First;
+
+            while(node.Value != item)
+            {
+                index++;
+                node = node.Next;
+                if(node == null)
+                {
+                    return -1;
+                }
+            }
+            return index;
 		}
 
 		public void Prepend(ZFrame item) 
 		{
-			Insert(0, item);
+            _frames.AddFirst(item);
 		}
 
 		public void Insert(int index, ZFrame item)
 		{
-			_frames.Insert(index, item);
+            ReplaceAt(index, item);
 		}
 
 		/// <summary>
@@ -115,11 +138,26 @@ namespace ZeroMQ
 		/// Removes ZFrames.
 		/// </summary>
 		/// <returns>The <see cref="ZeroMQ.ZFrame"/>.</returns>
+        /// <param name="index">element index for remove</param>
 		/// <param name="dispose">If set to <c>false</c>, do not dispose the ZFrame.</param>
 		public ZFrame RemoveAt(int index, bool dispose)
 		{
-			ZFrame frame = _frames[index];
-			_frames.RemoveAt(index);
+            ZFrame frame;
+            if(index == 0)
+            {
+                frame = _frames.First();
+                _frames.RemoveFirst();
+            }
+            else if(index == _frames.Count)
+            {
+                frame = _frames.Last();
+                _frames.RemoveLast();
+            }
+            else
+            {
+                frame = _frames.ElementAt(index);
+                _frames.Remove(frame);
+            }
 
 			if (dispose)
 			{
@@ -259,11 +297,11 @@ namespace ZeroMQ
 		{
 			get
 			{
-				return _frames[index];
+				return _frames.ElementAt(index);
 			}
 			set
 			{
-				_frames[index] = value;
+				Insert(index, value);
 			}
 		}
 
@@ -283,12 +321,15 @@ namespace ZeroMQ
 
 		public void Add(ZFrame item)
 		{
-			_frames.Add(item);
+			_frames.AddLast(item);
 		}
 
 		public void AddRange(IEnumerable<ZFrame> items)
 		{
-			_frames.AddRange(items);
+            foreach(var item in items)
+            {
+                _frames.AddLast(item);
+            }
 		}
 
 		public void Clear()
